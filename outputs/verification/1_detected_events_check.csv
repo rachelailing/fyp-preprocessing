@@ -1,0 +1,26 @@
+check_id,video_name,event_id,code_label,code_start_sec,code_end_sec,code_duration_sec,code_peak_MAR,code_oscillations,real_event_YN,boundaries_ok_YN,observed_behaviour,observed_start_sec,observed_end_sec,observed_openness_1to4,observed_oscillations,notes
+1,10-FemaleNoGlasses-Normal.avi,1,normal,5.4054,6.1728,0.8008,0.193506,1,N,,,,,,,head moved
+2,1-FemaleNoGlasses-Talking.avi,1,talking/singing,0.5005,10.2102,9.7431,0.428694,35,Y,,,,,,,
+3,1-FemaleNoGlasses-Talking.avi,2,talking/singing,10.4104,10.5439,0.1668,0.162891,1,Y,,,,,,,
+4,1-FemaleNoGlasses-Talking.avi,3,talking/singing,11.1445,11.4781,0.367,0.188544,1,Y,,,,,,,she just smile
+5,1-FemaleNoGlasses-Talking.avi,4,talking/singing,12.8462,15.8158,3.003,0.238535,9,Y,,,,,,,
+6,1-FemaleNoGlasses-Talking.avi,5,talking/singing,16.0494,16.4164,0.4004,0.262947,1,Y,,,,,,,
+7,1-FemaleNoGlasses-Talking.avi,6,talking/singing,16.9503,17.1171,0.2002,0.175354,1,Y,,,,,,,
+8,1-FemaleNoGlasses-Talking.avi,7,talking/singing,18.0514,18.3517,0.3337,0.187844,1,N,,,,,,,just show teeth briefly
+9,10-FemaleNoGlasses-Talking.avi,1,talking/singing,1.4348,1.5349,0.1335,0.164217,0,N,,starts open mouth,0:00,,,,
+10,10-FemaleNoGlasses-Talking.avi,2,talking/singing,1.7684,1.9353,0.2002,0.178495,1,Y,,,,,,,
+11,10-FemaleNoGlasses-Talking.avi,3,talking/singing,2.5692,3.9706,1.4348,0.18967,3,Y,,,,,,,
+12,10-FemaleNoGlasses-Talking.avi,4,talking/singing,6.9403,7.1071,0.2002,0.209794,1,Y,,,,,,,
+13,10-FemaleNoGlasses-Talking.avi,5,talking/singing,11.011,11.4114,0.4338,0.324896,1,Y,,,,,,,
+14,10-FemaleNoGlasses-Talking.avi,6,talking/singing,11.6783,11.8452,0.2002,0.165486,1,Y,,,,,,,
+15,10-FemaleNoGlasses-Talking.avi,7,talking/singing,13.3467,13.5135,0.2002,0.183956,1,?,,,,,,,
+16,10-FemaleNoGlasses-Talking.avi,8,talking/singing,17.6176,18.8855,1.3013,0.211203,5,Y,,,,,,,
+17,10-FemaleNoGlasses-Talking.avi,9,talking/singing,19.2192,19.3527,0.1668,0.166611,1,Y,,,,,,,
+18,10-FemaleNoGlasses-Talking.avi,10,talking/singing,19.7531,20.1535,0.4338,0.243246,1,Y,,,,,,,
+19,10-FemaleNoGlasses-Talking.avi,11,talking/singing,21.021,21.7551,0.7674,0.201167,1,Y,,,,,,,
+20,10-FemaleNoGlasses-Talking.avi,12,talking/singing,22.5225,22.7894,0.3003,0.188001,1,Y,,,,,,,
+21,10-FemaleNoGlasses-Talking.avi,13,talking/singing,26.66,32.5659,5.9393,0.373356,25,Y,,,,,,,
+22,10-FemaleNoGlasses-Talking.avi,14,talking/singing,32.9329,34.2342,1.3347,0.211961,5,Y,,,,,,,
+23,1-FemaleNoGlasses-Yawning.avi,1,yawning,1.6016,5.6056,4.0374,1.089859,7,Y,,,,,,,
+24,1-FemaleNoGlasses-Yawning.avi,2,yawning,7.641,7.8745,0.2669,0.182573,1,N,,just open a bit briefly,,,,,head moved left and right a bit
+25,10-FemaleNoGlasses-Yawning.avi,1,yawning,2.7361,3.4034,0.7007,0.423459,1,N,,already starts from early,0:00,0:05,,,then another yawning from 0:11 to 0:16

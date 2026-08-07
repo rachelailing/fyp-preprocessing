@@ -1,0 +1,34 @@
+# Dataset — 5.2 GB of YawDD videos. Obtained separately, see README.md.
+YawDD dataset/
+*.avi
+*.rar
+*.rar.gz
+
+# Virtual environment — recreate with: pip install -r requirements.txt
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# MediaPipe model — 3.6 MB binary, download URL is in README.md
+models/*.task
+
+# Trained models
+*.pkl
+*.joblib
+*.onnx
+
+# Signed report — carries signatures and student ID, not for a public repo
+Interim Report*.pdf
+*_Signed.pdf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,7 @@
+video_name,event_id,start_frame,end_frame,duration_sec,peak_MAR,opening_speed,closing_speed,oscillation_count,baseline_deviation,label
+1-FemaleNoGlasses-Talking.avi,1,182,214,1.1011,0.428694,0.542454,0.226601,3,0.421089,talking/singing
+10-FemaleNoGlasses-Talking.avi,1,333,339,0.2336,0.324896,0.266105,0.664505,1,0.316501,talking/singing
+10-FemaleNoGlasses-Talking.avi,2,957,968,0.4004,0.373356,0.587337,0.569934,1,0.36496,talking/singing
+1-FemaleNoGlasses-Yawning.avi,1,56,163,3.6036,1.089859,0.282618,0.982867,7,1.073162,yawning
+10-FemaleNoGlasses-Yawning.avi,1,8,132,4.1708,0.423459,0.042918,0.114874,7,0.151035,yawning
+10-FemaleNoGlasses-Yawning.avi,2,355,481,4.2376,0.391809,0.029409,0.148237,15,0.119385,yawning
