@@ -9,6 +9,9 @@ YawDD dataset/
 venv/
 env/
 
+# Superseded Colab notebook export, kept locally for reference only
+mod_yawn.py
+
 # Python
 __pycache__/
 *.py[cod]

@@ -1,3 +1,12 @@
 opencv-python
 mediapipe
 numpy
+
+# training and evaluation (train.py)
+pandas
+scikit-learn
+joblib
+
+# Intel Extension for Scikit-learn — oneDAL-accelerated estimators on Intel CPUs.
+# Optional: train.py falls back to stock scikit-learn if it is not installed.
+scikit-learn-intelex
