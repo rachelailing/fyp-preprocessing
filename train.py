@@ -23,11 +23,37 @@ FEATURE_COLS = [
     "peak_MAR",
     "opening_speed",
     "closing_speed",
+    "oscillation_rate",
+    "baseline_deviation",
+]
+
+# Columns read straight from the CSV, before oscillation_rate is derived.
+RAW_FEATURE_COLS = [
+    "duration_sec",
+    "peak_MAR",
+    "opening_speed",
+    "closing_speed",
     "oscillation_count",
     "baseline_deviation",
 ]
 
+
+def oscillation_rate(oscillation_count: float, duration_sec: float) -> float:
+    """Direction changes per second, rather than per event.
+
+    The raw count is confounded with duration: a YawDD yawn lasts 3.3 seconds
+    and a talking event 0.4, so the longer event accumulates more direction
+    changes simply by lasting longer, and the count ends up ranking yawns
+    higher. That inverts on live footage, where continuous speech produces one
+    long jagged event and a yawn produces one smooth rise and fall. Dividing by
+    duration measures how jagged the movement is instead of how long it ran,
+    which is the property that actually distinguishes the two behaviours.
+    """
+
+    return float(oscillation_count) / max(float(duration_sec), 1e-6)
+
 POSITIVE_CLASS = "yawning"
+NEGATIVE_CLASS = "non-yawn"
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,6 +88,15 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=2000,
         help="Single-sample predictions used to measure inference latency.",
+    )
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help=(
+            "Participant-grouped folds used for the cross-validated summary. "
+            "Every driver is held out exactly once across the folds."
+        ),
     )
     return parser.parse_args()
 
@@ -113,10 +148,16 @@ def load_features(path: Path) -> pd.DataFrame:
         raise SystemExit(f"Feature file not found: {path}")
 
     frame = pd.read_csv(path)
-    missing = [column for column in FEATURE_COLS + ["label", "video_name"] if column not in frame]
+    missing = [
+        column for column in RAW_FEATURE_COLS + ["label", "video_name"]
+        if column not in frame
+    ]
     if missing:
         raise SystemExit(f"Feature file is missing columns: {missing}")
 
+    frame["oscillation_rate"] = (
+        frame["oscillation_count"] / frame["duration_sec"].clip(lower=1e-6)
+    )
     frame["participant"] = frame["video_name"].map(participant_id)
     return frame
 
@@ -213,7 +254,12 @@ def evaluate(model, X, y_true, title: str, positive: str) -> None:
 ABLATIONS: dict[str, list[str]] = {
     "peak_MAR only (MAR-threshold proxy)": ["peak_MAR"],
     "magnitude only": ["peak_MAR", "baseline_deviation"],
-    "temporal only": ["duration_sec", "opening_speed", "closing_speed", "oscillation_count"],
+    "temporal, raw oscillation count": [
+        "duration_sec", "opening_speed", "closing_speed", "oscillation_count",
+    ],
+    "temporal only": [
+        "duration_sec", "opening_speed", "closing_speed", "oscillation_rate",
+    ],
     "all six features": FEATURE_COLS,
 }
 
@@ -254,6 +300,100 @@ def run_ablation(train: pd.DataFrame, test: pd.DataFrame, args: argparse.Namespa
         print(f"  {name:<38} {precision:6.3f} {recall:7.3f} {f1:6.3f} {fpr:8.4f}")
 
     print("\n  FPR is the share of non-yawning events wrongly flagged; lower is better.")
+
+
+def binary_target(labels: pd.Series) -> pd.Series:
+    """Collapse the three classes into the decision the alert logic actually makes."""
+
+    return labels.where(labels == POSITIVE_CLASS, NEGATIVE_CLASS)
+
+
+def participant_folds(frame: pd.DataFrame, random_state: int, n_splits: int):
+    """Build folds in which every participant is held out exactly once."""
+
+    from sklearn.model_selection import StratifiedGroupKFold
+
+    splitter = StratifiedGroupKFold(
+        n_splits=n_splits, shuffle=True, random_state=random_state
+    )
+    return list(splitter.split(frame, frame["label"], frame["participant"]))
+
+
+def score_fold(
+    train: pd.DataFrame,
+    test: pd.DataFrame,
+    columns: list[str],
+    args: argparse.Namespace,
+) -> tuple[float, float, float, float]:
+    """Train on one fold's drivers and score the yawning class on the held-out ones."""
+
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import precision_recall_fscore_support
+
+    model = RandomForestClassifier(
+        n_estimators=args.n_estimators,
+        max_depth=args.max_depth,
+        class_weight="balanced",
+        random_state=args.random_state,
+        n_jobs=-1,
+    )
+    model.fit(train[columns].to_numpy(), binary_target(train["label"]))
+    predictions = model.predict(test[columns].to_numpy())
+
+    truth = binary_target(test["label"])
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        truth, predictions,
+        labels=[POSITIVE_CLASS], average=None, zero_division=0,
+    )
+    return (
+        float(precision[0]),
+        float(recall[0]),
+        float(f1[0]),
+        false_positive_rate(truth, predictions, POSITIVE_CLASS),
+    )
+
+
+def format_cell(mean: float, deviation: float) -> str:
+    """Render one mean/spread pair at a fixed width so columns line up."""
+
+    return "{:>15}".format("{:.3f}+-{:.3f}".format(mean, deviation))
+
+
+def cross_validate(frame: pd.DataFrame, args: argparse.Namespace) -> None:
+    """Score every feature set across all participant-grouped folds.
+
+    One held-out fold is not a stable estimate on this dataset. With 90
+    participants and a few hundred yawning events, which drivers happen to land
+    in the test fold moves precision and false positive rate enough to change
+    which feature set looks best. Reporting the mean and spread over folds that
+    hold out every driver exactly once states that uncertainty instead of
+    hiding it behind whichever fold the splitter returned first.
+    """
+
+    folds = participant_folds(frame, args.random_state, args.cv_folds)
+
+    print(f"\n{'=' * 78}")
+    print(f"CROSS-VALIDATED yawn vs non-yawn - {len(folds)} participant-grouped folds")
+    print(f"{'=' * 78}")
+    header = "".join("{:>15}".format(name) for name in ("precision", "recall", "F1", "FPR"))
+    print(f"  {'feature set':<38}{header}")
+
+    per_fold_fpr: dict[str, list[float]] = {}
+    for name, columns in ABLATIONS.items():
+        scores = np.array([
+            score_fold(frame.iloc[train_index], frame.iloc[test_index], columns, args)
+            for train_index, test_index in folds
+        ])
+        means, deviations = scores.mean(axis=0), scores.std(axis=0)
+        cells = "".join(format_cell(mean, deviation) for mean, deviation in zip(means, deviations))
+        print(f"  {name:<38}{cells}")
+        per_fold_fpr[name] = list(scores[:, 3])
+
+    print("\n  Values are mean +- standard deviation across folds.")
+    # Printed explicitly because the spread, not the average, is the reason a
+    # single-fold result should not be quoted on its own.
+    spread = " ".join(f"{value:.3f}" for value in per_fold_fpr["all six features"])
+    print(f"  Per-fold FPR, all six features: {spread}")
 
 
 def benchmark_latency(model, X, iterations: int) -> None:
@@ -334,6 +474,7 @@ def main() -> None:
         print(f"  {feature:<20} {importance:.4f}  {'#' * int(importance * 60)}")
 
     run_ablation(train, test, args)
+    cross_validate(frame, args)
 
     # Secondary framing: the deployed system only ever needs to decide whether to
     # raise an alert, so yawn vs non-yawn is what the alert logic actually uses.
@@ -351,10 +492,30 @@ def main() -> None:
     evaluate(binary_classifier, features_of(test), binary_test,
              "BINARY yawn vs non-yawn - TEST (held-out drivers)", POSITIVE_CLASS)
 
+    # The webcam prototype ships this one. Peak MAR and baseline deviation are
+    # absolute mouth openings, and they do not transfer between camera setups:
+    # the same speech produces roughly twice the MAR on a desk-mounted webcam as
+    # it does in YawDD's mirror footage, which drags magnitude-driven models
+    # toward calling talking a yawn. Durations and speeds are measured in
+    # seconds and carry across unchanged, and the ablation already ranks them
+    # highest on held-out drivers.
+    temporal_columns = ABLATIONS["temporal only"]
+    temporal_classifier = RandomForestClassifier(
+        n_estimators=args.n_estimators,
+        max_depth=args.max_depth,
+        class_weight="balanced",
+        random_state=args.random_state,
+        n_jobs=-1,
+    )
+    temporal_classifier.fit(train[temporal_columns].to_numpy(), binary_train)
+    evaluate(temporal_classifier, test[temporal_columns].to_numpy(), binary_test,
+             "BINARY temporal-only - TEST (held-out drivers)", POSITIVE_CLASS)
+
     # Parallelism speeds up training but adds thread-pool overhead to every
     # single-event prediction, so the deployed model is switched to serial.
     classifier.n_jobs = 1
     binary_classifier.n_jobs = 1
+    temporal_classifier.n_jobs = 1
 
     benchmark_latency(classifier, features_of(test), args.benchmark_iterations)
     print(f"  Intel Extension for Scikit-learn: {'enabled' if accelerated else 'disabled'}")
@@ -363,7 +524,9 @@ def main() -> None:
     joblib.dump(classifier, args.model_out)
     binary_path = args.model_out.with_name(args.model_out.stem + "_binary.pkl")
     joblib.dump(binary_classifier, binary_path)
-    print(f"\nSaved {args.model_out} and {binary_path}")
+    temporal_path = args.model_out.with_name(args.model_out.stem + "_temporal.pkl")
+    joblib.dump(temporal_classifier, temporal_path)
+    print(f"\nSaved {args.model_out}, {binary_path} and {temporal_path}")
 
 
 if __name__ == "__main__":

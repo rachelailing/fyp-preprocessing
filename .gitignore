@@ -26,6 +26,10 @@ models/*.task
 *.joblib
 *.onnx
 
+# Generated data — event feature CSVs and recorded webcam MAR traces.
+# Regenerate with main.py; realtime.py --record-signal produces the traces.
+outputs/
+
 # Signed report — carries signatures and student ID, not for a public repo
 Interim Report*.pdf
 *_Signed.pdf
