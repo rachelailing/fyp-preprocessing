@@ -36,6 +36,10 @@ outputs/
 Interim Report*.pdf
 *_Signed.pdf
 
+# Working documents — team updates and drafts, not part of the deliverable
+Team_Update*.docx
+*.docx
+
 # OS / editor
 .DS_Store
 Thumbs.db
