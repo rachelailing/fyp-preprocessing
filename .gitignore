@@ -18,13 +18,15 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 
-# MediaPipe model — 3.6 MB binary, download URL is in README.md
-models/*.task
-
-# Trained models
+# Trained models and the MediaPipe landmarker are committed, about 5 MB in
+# total, so the demo runs straight after a clone with no retraining and no
+# separate download. The pickles are tied to the scikit-learn version pinned
+# in requirements.txt.
 *.pkl
 *.joblib
 *.onnx
+!models/*.pkl
+!models/*.task
 
 # Generated data — event feature CSVs and recorded webcam MAR traces.
 # Regenerate with main.py; realtime.py --record-signal produces the traces.

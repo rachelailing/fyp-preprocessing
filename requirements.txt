@@ -4,7 +4,11 @@ numpy
 
 # training and evaluation (train.py)
 pandas
-scikit-learn
+# Pinned because the trained models in models/ are pickled by this version.
+# A pickle written by one scikit-learn release is not guaranteed to load in
+# another, so an unpinned install can fail to open the committed models.
+# Retraining with train.py takes under a second if you prefer a newer release.
+scikit-learn==1.9.0
 joblib
 
 # Intel Extension for Scikit-learn — oneDAL-accelerated estimators on Intel CPUs.
