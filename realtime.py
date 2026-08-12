@@ -165,6 +165,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--backend",
+        choices=("sklearn", "onnx", "openvino"),
+        default="sklearn",
+        help=(
+            "Inference engine. sklearn is the reference. onnx and openvino read "
+            "the converted models produced by export_openvino.py and are far "
+            "faster per event, because they skip the Python-side validation "
+            "that dominates a single scikit-learn prediction."
+        ),
+    )
+    parser.add_argument(
         "--no-sklearnex",
         action="store_true",
         help="Disable Intel Extension for Scikit-learn.",
@@ -183,6 +194,64 @@ def enable_intel_acceleration(enabled: bool) -> bool:
         return False
     patch_sklearn(verbose=False)
     return True
+
+
+class Predictor:
+    """One predict call over three inference engines.
+
+    The class order always comes from the scikit-learn model, even when another
+    engine does the arithmetic. The converted models carry no label names, so
+    reading the order from anywhere else risks silently swapping yawn and
+    non-yawn if an export is ever regenerated differently.
+    """
+
+    def __init__(self, backend: str, model_path: Path) -> None:
+        import joblib
+
+        reference = joblib.load(model_path)
+        self.classes = [str(name) for name in reference.classes_]
+        self.backend = backend
+
+        if backend == "sklearn":
+            # Thread-pool overhead exceeds the work for a single event.
+            reference.n_jobs = 1
+            self._model = reference
+            return
+
+        suffix = ".onnx" if backend == "onnx" else ".xml"
+        converted = model_path.with_suffix(suffix)
+        if not converted.exists():
+            raise SystemExit(
+                f"{converted} not found. Generate it with:\n"
+                f"    python export_openvino.py --model {model_path}"
+            )
+
+        if backend == "onnx":
+            import onnxruntime as ort
+
+            self._session = ort.InferenceSession(
+                str(converted), providers=["CPUExecutionProvider"]
+            )
+            self._input_name = self._session.get_inputs()[0].name
+        else:
+            import openvino as ov
+
+            compiled = ov.Core().compile_model(str(converted), "CPU")
+            self._request = compiled.create_infer_request()
+            self._output_port = compiled.output(0)
+
+    def probabilities(self, features):
+        """Return class probabilities for one event's feature vector."""
+
+        import numpy as np
+
+        if self.backend == "sklearn":
+            return self._model.predict_proba(features.astype(np.float64))[0]
+
+        as_float32 = features.astype(np.float32)
+        if self.backend == "onnx":
+            return self._session.run(None, {self._input_name: as_float32})[1][0]
+        return self._request.infer({0: as_float32})[self._output_port][0]
 
 
 class EventTracker:
@@ -274,7 +343,7 @@ class EventTracker:
 
 
 def classify(
-    model,
+    predictor: "Predictor",
     event: pipeline.Event,
     fps: float,
     baseline: float,
@@ -295,10 +364,10 @@ def classify(
     features = np.array([[float(row[column]) for column in columns]])
 
     start = time.perf_counter()
-    probabilities = model.predict_proba(features)[0]
+    probabilities = predictor.probabilities(features)
     latency_ms = (time.perf_counter() - start) * 1000
 
-    classes = list(model.classes_)
+    classes = predictor.classes
     yawn_probability = float(probabilities[classes.index(POSITIVE_CLASS)])
 
     # Thresholding the probability instead of taking the argmax makes the
@@ -379,15 +448,18 @@ def draw_overlay(frame, tracker: EventTracker, state: dict, args: argparse.Names
 def main() -> None:
     args = parse_args()
 
-    accelerated = enable_intel_acceleration(not args.no_sklearnex)
-    import joblib
+    # Only meaningful for the sklearn backend; onnx and openvino do not go
+    # through scikit-learn's estimators at all.
+    accelerated = enable_intel_acceleration(
+        not args.no_sklearnex and args.backend == "sklearn"
+    )
 
     pipeline.load_dependencies()
     import cv2
 
     if not args.model.exists():
         raise SystemExit(f"Model not found: {args.model}. Run train.py first.")
-    model = joblib.load(args.model)
+    predictor = Predictor(args.backend, args.model)
 
     capture = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
     if not capture.isOpened():
@@ -402,7 +474,7 @@ def main() -> None:
     capture.set(cv2.CAP_PROP_FPS, args.capture_fps)
 
     print(f"Intel Extension for Scikit-learn: {'enabled' if accelerated else 'disabled'}")
-    print(f"Model: {args.model}")
+    print(f"Model: {args.model} | backend: {args.backend} | features: {args.feature_set}")
     print("Press q to quit.\n")
 
     tracker = EventTracker(args)
@@ -461,7 +533,7 @@ def main() -> None:
                     event = tracker.update(frame_index, mar, measured_fps)
                     if event is not None:
                         label, probability, latency_ms, row = classify(
-                            model, event, measured_fps, tracker.baseline, args
+                            predictor, event, measured_fps, tracker.baseline, args
                         )
                         state.update(
                             events=state["events"] + 1,

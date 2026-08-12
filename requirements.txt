@@ -14,3 +14,14 @@ joblib
 # Intel Extension for Scikit-learn — oneDAL-accelerated estimators on Intel CPUs.
 # Optional: train.py falls back to stock scikit-learn if it is not installed.
 scikit-learn-intelex
+
+# Accelerated inference backends for realtime.py --backend onnx|openvino.
+# The converted models are committed, so these are all that is needed to run
+# them; the export toolchain below is not.
+openvino
+onnxruntime
+
+# Export toolchain, only needed to regenerate the converted models with
+# export_openvino.py. Skip these unless you are re-exporting: hummingbird-ml
+# pulls in PyTorch, which is a multi-gigabyte download.
+#   pip install skl2onnx onnx onnxscript hummingbird-ml

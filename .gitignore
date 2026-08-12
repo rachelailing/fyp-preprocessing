@@ -27,6 +27,11 @@ __pycache__/
 *.onnx
 !models/*.pkl
 !models/*.task
+!models/*.onnx
+!models/*.xml
+!models/*.bin
+# Intermediate produced on the way to the OpenVINO IR; the .xml/.bin supersede it.
+models/*_ov.onnx
 
 # Generated data — event feature CSVs and recorded webcam MAR traces.
 # Regenerate with main.py; realtime.py --record-signal produces the traces.
